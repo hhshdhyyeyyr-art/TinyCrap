@@ -1,0 +1,46 @@
+name: Android APK Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        working-directory: frontend
+        run: chmod +x gradlew
+
+      - name: Build release APK
+        working-directory: frontend
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Prepare APK
+        run: |
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' frontend/app/build.gradle.kts)
+          mkdir -p release-apk
+          cp frontend/app/build/outputs/apk/release/app-release.apk "release-apk/tinycrap-${VERSION}.apk"
+          ls -lh release-apk/
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: v${{ env.VERSION }}
+          files: release-apk/tinycrap-*.apk
+          generate_release_notes: true
